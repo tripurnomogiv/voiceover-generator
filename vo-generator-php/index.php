@@ -126,20 +126,17 @@ btn.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form,
     });
+    const data = await res.json();
 
-    // Gagal generate -> respons JSON berisi {error}
-    if (!res.ok || (res.headers.get('content-type') || '').includes('application/json')) {
-      const data = await res.json();
-      statusEl.textContent = (data && data.error) || ('Error HTTP ' + res.status);
+    if (data.error) {
+      statusEl.textContent = data.error;
       statusEl.classList.add('err');
       return;
     }
 
-    // Sukses -> WAV biner, buat object URL agar bisa diputar & diunduh
-    const blob = await res.blob();
-    const wavUrl = URL.createObjectURL(blob);
-    player.src = wavUrl;
-    download.href = wavUrl;
+    // Sukses -> play langsung dari generate.php, download lewat download.php
+    player.src = 'generate.php?play=' + data.token + '&name=' + encodeURIComponent(makeSlug(text));
+    download.href = 'download.php?token=' + data.token + '&name=' + encodeURIComponent(makeSlug(text));
     resultEl.classList.add('show');
     statusEl.textContent = 'Selesai. Audio siap diputar / diunduh.';
   } catch (e) {
@@ -149,6 +146,12 @@ btn.addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+
+// Ubah awal teks jadi slug untuk nama file, mis. "Mouse gaming ini..." -> "mouse-gaming"
+function makeSlug(str) {
+  const words = str.trim().toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  return words.slice(0, 3).join('-') || 'voiceover';
+}
 </script>
 </body>
 </html>

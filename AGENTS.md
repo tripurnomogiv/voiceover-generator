@@ -2,6 +2,7 @@
 
 ## Project Overview
 Single-file FastAPI web app for generating voiceover audio from text using the free Gemini Developer API (TTS).
+Also includes a PHP version (`vo-generator-php/`) for shared hosting.
 
 ## Tech Stack
 - **Backend**: FastAPI + uvicorn
@@ -37,3 +38,12 @@ Set in `.env`:
 - Output audio is raw PCM 16-bit 24kHz, converted to WAV in `pcm_to_wav()`.
 - Voice list + language list defined in `VOICES` / `LANGS`.
 - Model name overridable via `model` field in request body.
+
+## PHP Version (`vo-generator-php/`)
+- For shared hosting (PHP 7.4+), uses cURL to call the same Interactions API.
+- Login: `shopee` / `affiliate` (set in `config.php`), session-based.
+- WAV saved to `generated/`, play via `generate.php?play=<token>`, download via `download.php?token=<token>&name=<slug>`.
+- IMPORTANT: WAV header built with `pack('A4VA4', 'RIFF', $size, 'WAVE')` — must include the `A4` format code for "WAVE", otherwise the file has no RIFF/WAVE marker and browsers can't play it.
+- Free tier rate limit: ~10 requests/minute per project (429 errors expected if exceeded).
+- Some short phrases may trigger Google content-policy blocks (false positives); use realistic sentences.
+

@@ -13,6 +13,25 @@ if (empty($_SESSION['logged_in'])) {
     exit;
 }
 
+// GET ?play=token -> putar WAV yang sudah disimpan (inline)
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['play'])) {
+    $token = preg_replace('/[^a-f0-9]/', '', $_GET['play']);
+    if (strlen($token) === 32) {
+        $saved = __DIR__ . '/generated/' . $token . '.wav';
+        if (is_file($saved)) {
+            header('Content-Type: audio/wav');
+            header('Content-Length: ' . filesize($saved));
+            header('Content-Disposition: inline; filename="voiceover.wav"');
+            readfile($saved);
+            exit;
+        }
+    }
+    http_response_code(404);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'File tidak ditemukan atau sudah kedaluwarsa.']);
+    exit;
+}
+
 // --- Validasi input ---
 $text = trim($_POST['text'] ?? '');
 if ($text === '') {
@@ -101,11 +120,33 @@ if (!$audioBase64) {
 $pcm = base64_decode($audioBase64);
 $wav = pcmToWav($pcm, 24000, 1, 2);
 
-// Kirim WAV langsung sebagai file biner
-header('Content-Type: audio/wav');
-header('Content-Length: ' . strlen($wav));
-header('Content-Disposition: inline; filename="voiceover.wav"');
-echo $wav;
+// Simpan WAV ke folder generated/ (diblokir akses langsung via .htaccess)
+$dir = __DIR__ . '/generated';
+if (!is_dir($dir)) {
+    @mkdir($dir, 0755, true);
+}
+$token = bin2hex(random_bytes(16));
+$file  = $dir . '/' . $token . '.wav';
+if (file_put_contents($file, $wav) === false) {
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Gagal menyimpan audio di server. Pastikan folder generated/ writable.']);
+    exit;
+}
+
+// Bersihkan file lama (> 30 menit) agar tidak menumpuk
+$maxAge = 30 * 60;
+foreach (glob($dir . '/*.wav') as $old) {
+    if (filemtime($old) < time() - $maxAge) {
+        @unlink($old);
+    }
+}
+
+header('Content-Type: application/json');
+echo json_encode([
+    'token' => $token,
+    'name'  => 'voiceover.wav',
+    'size'  => strlen($wav),
+]);
 exit;
 
 function pcmToWav(string $pcm, int $rate, int $channels, int $sampleWidth): string
@@ -114,7 +155,7 @@ function pcmToWav(string $pcm, int $rate, int $channels, int $sampleWidth): stri
     $byteRate = $rate * $channels * $sampleWidth;
     $blockAlign = $channels * $sampleWidth;
 
-    $riff = pack('A4V', 'RIFF', 36 + $dataSize, 'WAVE');
+    $riff = pack('A4VA4', 'RIFF', 36 + $dataSize, 'WAVE');
     $fmt  = pack('A4VvvVVvv', 'fmt ', 16, 1, $channels, $rate, $byteRate, $blockAlign, $sampleWidth * 8);
     $data = pack('A4V', 'data', $dataSize);
 

@@ -52,21 +52,27 @@ if ($pronounce !== '') {
 if (!isset($VOICES[$voice])) $voice = $DEFAULT_VOICE;
 if (!in_array($lang, $LANGS)) $lang = $DEFAULT_LANG;
 
-// --- Susun request ke Interactions API (output audio) ---
-$content = $prompt . ': ' . $text;
+// --- Susun request ke streamGenerateContent (format playground resmi) ---
+// Prompt dijadikan bagian teks: gaya & instruksi aksen lalu transcript.
+$content = $prompt . "\n\n## Transcript:\n" . $text;
 
 $body = [
-    'model' => $MODEL,
-    'input' => $content,
-    'response_format' => ['type' => 'audio'],
-    'generation_config' => [
+    'contents' => [
+        ['role' => 'user', 'parts' => [['text' => $content]]],
+    ],
+    'generationConfig' => [
+        'responseModalities' => ['audio'],
+        'temperature' => 1,
         'speech_config' => [
-            ['voice' => $voice],
+            'voice_config' => [
+                'prebuilt_voice_config' => ['voice_name' => $voice],
+            ],
         ],
     ],
 ];
 
-$url = 'https://generativelanguage.googleapis.com/v1beta/interactions?key=' . urlencode($GEMINI_API_KEY);
+$url = 'https://generativelanguage.googleapis.com/v1beta/models/'
+     . $MODEL . ':streamGenerateContent?key=' . urlencode($GEMINI_API_KEY);
 
 $ch = curl_init($url);
 curl_setopt_array($ch, [
@@ -99,30 +105,37 @@ if ($httpCode !== 200) {
     exit;
 }
 
-// Audio PCM 16-bit (base64) di dalam steps[].content[].data
-$audioBase64 = null;
-foreach ($data['steps'] ?? [] as $step) {
-    foreach ($step['content'] ?? [] as $part) {
-        if (!empty($part['data'])) {
-            $audioBase64 = $part['data'];
-            break 2;
+// Respons streamGenerateContent = array chunk.
+// Audio base64 di candidates[].content.parts[].inlineData.data (gabungkan semua).
+$rate = 24000;
+$audioBase64 = '';
+foreach ((array)$data as $chunk) {
+    foreach ($chunk['candidates'] ?? [] as $cand) {
+        foreach ($cand['content']['parts'] ?? [] as $part) {
+            $inline = $part['inlineData'] ?? null;
+            if ($inline && !empty($inline['data'])) {
+                $audioBase64 .= $inline['data'];
+                if (isset($inline['mimeType']) && preg_match('/rate=(\d+)/', $inline['mimeType'], $m)) {
+                    $rate = (int)$m[1];
+                }
+            }
         }
     }
 }
-// Fallback: struktur lama (outputAudio.data)
-if (!$audioBase64) {
-    $audioBase64 = $data['outputAudio']['data'] ?? null;
+// Fallback: non-stream struktur (parts[].inlineData)
+if ($audioBase64 === '' && isset($data['candidates'][0]['content']['parts'][0]['inlineData']['data'])) {
+    $audioBase64 = $data['candidates'][0]['content']['parts'][0]['inlineData']['data'];
 }
 
-if (!$audioBase64) {
+if ($audioBase64 === '') {
     header('Content-Type: application/json');
     echo json_encode(['error' => 'Respons tidak mengandung audio.']);
     exit;
 }
 
-// Decode PCM 16-bit 24kHz, bungkus jadi WAV agar bisa diputar browser
+// Decode PCM 16-bit, bungkus jadi WAV agar bisa diputar browser
 $pcm = base64_decode($audioBase64);
-$wav = pcmToWav($pcm, 24000, 1, 2);
+$wav = pcmToWav($pcm, $rate, 1, 2);
 
 // Simpan WAV ke folder generated/ (diblokir akses langsung via .htaccess)
 $dir = __DIR__ . '/generated';

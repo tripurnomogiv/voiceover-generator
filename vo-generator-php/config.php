@@ -11,14 +11,22 @@ $AUTH_USER = 'shopee';
 $AUTH_PASS = 'affiliate';
 $AUTH_SESSION_NAME = 'vo_gen_auth';
 
-// Model gratis (input & output). Hemat: gemini-2.5-flash-preview-tts
-// Alternatif: gemini-3.1-flash-tts-preview
-$MODEL = 'gemini-2.5-flash-preview-tts';
+// Model gratis (input & output). Disarankan: gemini-3.1-flash-tts-preview
+// Alternatif: gemini-2.5-flash-preview-tts
+$MODEL = 'gemini-3.1-flash-tts-preview';
 
 // Suara default (host video affiliate Shopee, energik & persuasif)
 $DEFAULT_VOICE = 'Despina';
 $DEFAULT_LANG  = 'id-ID';
-$DEFAULT_PROMPT = 'Kamu adalah host video affiliate Shopee yang energik dan persuasif. Bicaralah dengan gaya voiceover promo yang ceria, jelas, dan meyakinkan sehingga penonton tertarik untuk membeli produk. Gunakan logat/bahasa Indonesia (id-ID) yang natural: lafalkan huruf sesuai pelafalan bahasa Indonesia (misalnya "produk" diucapkan pro-duk), bukan logat bahasa Inggris.';
+$DEFAULT_PROMPT = 'Read the following transcript based on the director\'s note.
+
+# Director\'s note
+Style: The "Vocal Smile": soft palate raised, tone bright, sunny, explicitly inviting.
+Pace: Fast, energetic, no dead air. Sentences overlap slightly.
+Accent: Indonesian (Bahasa Indonesia, id-ID) — pronounce letters following Indonesian phonetics (e.g. "produk" said as pro-duk), NOT English accent.
+
+## Scene:
+menceritakan kelebihan produk dan persuasif agar orang tertarik beli';
 
 // Daftar suara (nama => gender)
 $VOICES = [

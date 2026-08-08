@@ -18,7 +18,7 @@ $MODEL = 'gemini-2.5-flash-preview-tts';
 // Suara default (host video affiliate Shopee, energik & persuasif)
 $DEFAULT_VOICE = 'Despina';
 $DEFAULT_LANG  = 'id-ID';
-$DEFAULT_PROMPT = 'Kamu adalah host video affiliate Shopee yang energik dan persuasif. Bicaralah dengan gaya voiceover promo yang ceria, jelas, dan meyakinkan sehingga penonton tertarik untuk membeli produk.';
+$DEFAULT_PROMPT = 'Kamu adalah host video affiliate Shopee yang energik dan persuasif. Bicaralah dengan gaya voiceover promo yang ceria, jelas, dan meyakinkan sehingga penonton tertarik untuk membeli produk. Gunakan logat/bahasa Indonesia (id-ID) yang natural: lafalkan huruf sesuai pelafalan bahasa Indonesia (misalnya "produk" diucapkan pro-duk), bukan logat bahasa Inggris.';
 
 // Daftar suara (nama => gender)
 $VOICES = [

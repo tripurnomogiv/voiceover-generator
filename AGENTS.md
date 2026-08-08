@@ -38,6 +38,7 @@ Set in `.env`:
 - Output audio is raw PCM 16-bit 24kHz, converted to WAV in `pcm_to_wav()`.
 - Voice list + language list defined in `VOICES` / `LANGS`.
 - Model name overridable via `model` field in request body.
+- Indonesian accent: `language_code` is NOT supported by the Interactions TTS API. To force Indonesian pronunciation, the default prompt explicitly instructs id-ID accent. Users can also set per-word overrides in the "Koreksi pelafalan" field (format `kata=ejaan` per line), applied by `apply_pronounce()` (Python) / `applyPronounce()` (PHP) before sending.
 
 ## PHP Version (`vo-generator-php/`)
 - For shared hosting (PHP 7.4+), uses cURL to call the same Interactions API.

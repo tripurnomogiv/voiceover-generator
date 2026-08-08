@@ -43,6 +43,10 @@ $voice   = $_POST['voice']   ?? $DEFAULT_VOICE;
 $lang    = $_POST['language'] ?? $DEFAULT_LANG;
 $prompt  = trim($_POST['prompt'] ?? $DEFAULT_PROMPT);
 if ($prompt === '') $prompt = $DEFAULT_PROMPT;
+$pronounce = trim($_POST['pronounce'] ?? '');
+if ($pronounce !== '') {
+    $text = applyPronounce($text, $pronounce);
+}
 
 // Pastikan voice/language valid (fallback ke default)
 if (!isset($VOICES[$voice])) $voice = $DEFAULT_VOICE;
@@ -160,4 +164,21 @@ function pcmToWav(string $pcm, int $rate, int $channels, int $sampleWidth): stri
     $data = pack('A4V', 'data', $dataSize);
 
     return $riff . $fmt . $data . $pcm;
+}
+
+function applyPronounce(string $text, string $rules): string
+{
+    foreach (preg_split('/\r?\n/', $rules) as $line) {
+        $line = trim($line);
+        if ($line === '' || strpos($line, '=') === false) {
+            continue;
+        }
+        [$kata, $ejaan] = array_map('trim', explode('=', $line, 2));
+        if ($kata === '' || $ejaan === '') {
+            continue;
+        }
+        // Ganti kata utuh (whole word), semua kemunculan, abaikan huruf kapital
+        $text = preg_replace('/\b' . preg_quote($kata, '/') . '\b/iu', $ejaan, $text);
+    }
+    return $text;
 }

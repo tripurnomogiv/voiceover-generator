@@ -17,6 +17,7 @@ Run:
 import base64
 import io
 import os
+import re
 import wave
 
 import uvicorn
@@ -70,7 +71,10 @@ LANGS = ["id-ID", "en-US"]
 DEFAULT_PROMPT = (
     "Kamu adalah host video affiliate Shopee yang energik dan persuasif. "
     "Bicaralah dengan gaya voiceover promo yang ceria, jelas, dan meyakinkan "
-    "sehingga penonton tertarik untuk membeli produk"
+    "sehingga penonton tertarik untuk membeli produk. "
+    "Gunakan logat/bahasa Indonesia (id-ID) yang natural: "
+    "lafalkan huruf sesuai pelafalan bahasa Indonesia (misalnya 'produk' diucapkan pro-duk), "
+    "bukan logat bahasa Inggris."
 )
 
 
@@ -80,6 +84,10 @@ class TTSRequest(BaseModel):
     language: str = "id-ID"
     prompt: str = DEFAULT_PROMPT
     model: str = DEFAULT_MODEL
+    # Koreksi pelafalan: string "kata=ejaan" satu per baris, mis.
+    #   produk=prodok
+    #   gudang=gu-dang
+    pronounce: str = ""
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -98,7 +106,8 @@ def generate(req: TTSRequest):
     if not req.text.strip():
         return {"error": "Teks tidak boleh kosong."}
 
-    content = f"{req.prompt}: {req.text}"
+    text = apply_pronounce(req.text, req.pronounce)
+    content = f"{req.prompt}: {text}"
     try:
         interaction = client.interactions.create(
             model=req.model,
@@ -128,6 +137,23 @@ def pcm_to_wav(pcm: bytes, rate: int, channels: int, sample_width: int) -> bytes
         wf.setframerate(rate)
         wf.writeframes(pcm)
     return buf.getvalue()
+
+
+def apply_pronounce(text: str, rules: str) -> str:
+    """Terapkan koreksi pelafalan 'kata=ejaan' (satu per baris) ke teks."""
+    if not rules or not rules.strip():
+        return text
+    for line in rules.splitlines():
+        line = line.strip()
+        if not line or "=" not in line:
+            continue
+        kata, _, ejaan = line.partition("=")
+        kata, ejaan = kata.strip(), ejaan.strip()
+        if not kata or not ejaan:
+            continue
+        # Ganti kata persis (utuh), semua kemunculan, abaikan huruf kapital
+        text = re.sub(r"\b" + re.escape(kata) + r"\b", ejaan, text, flags=re.IGNORECASE)
+    return text
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -186,7 +212,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <label for="prompt">Gaya bicara (opsional)</label>
-  <input id="prompt" type="text" value="Kamu adalah host video affiliate Shopee yang energik dan persuasif. Bicaralah dengan gaya voiceover promo yang ceria, jelas, dan meyakinkan sehingga penonton tertarik untuk membeli produk.">
+  <input id="prompt" type="text" value="Kamu adalah host video affiliate Shopee yang energik dan persuasif. Bicaralah dengan gaya voiceover promo yang ceria, jelas, dan meyakinkan sehingga penonton tertarik untuk membeli produk. Gunakan logat/bahasa Indonesia (id-ID) yang natural: lafalkan huruf sesuai pelafalan bahasa Indonesia (misalnya 'produk' diucapkan pro-duk), bukan logat bahasa Inggris.">
+
+  <label for="pronounce">Koreksi pelafalan (opsional) — format: <code>kata=ejaan</code> tiap baris</label>
+  <textarea id="pronounce" rows="3" placeholder="produk=pro-duk&#10;gudang=gu-dang" style="min-height:70px"></textarea>
 
   <button id="btn">Generate</button>
   <div class="status" id="status"></div>
@@ -222,6 +251,7 @@ btn.addEventListener('click', async () => {
         voice: document.getElementById('voice').value,
         language: document.getElementById('lang').value,
         prompt: document.getElementById('prompt').value,
+        pronounce: document.getElementById('pronounce').value,
       }),
     });
     const data = await res.json();

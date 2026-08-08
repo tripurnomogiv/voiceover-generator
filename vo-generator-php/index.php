@@ -88,6 +88,9 @@ foreach ($LANGS as $l) {
   <label for="prompt">Gaya bicara (opsional)</label>
   <input id="prompt" type="text" value="<?php echo htmlspecialchars($DEFAULT_PROMPT); ?>">
 
+  <label for="pronounce">Koreksi pelafalan (opsional) — format: <code>kata=ejaan</code> tiap baris</label>
+  <textarea id="pronounce" rows="3" placeholder="produk=pro-duk&#10;gudang=gu-dang" style="min-height:70px"></textarea>
+
   <button id="btn">Generate</button>
   <div class="status" id="status"></div>
 
@@ -119,6 +122,7 @@ btn.addEventListener('click', async () => {
   form.append('voice', document.getElementById('voice').value);
   form.append('language', document.getElementById('lang').value);
   form.append('prompt', document.getElementById('prompt').value);
+  form.append('pronounce', document.getElementById('pronounce').value);
 
   try {
     const res = await fetch('generate.php', {

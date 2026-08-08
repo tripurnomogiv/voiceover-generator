@@ -54,3 +54,11 @@ $VOICES = [
 
 // Bahasa yang didukung
 $LANGS = ['id-ID', 'en-US'];
+
+// --- History hasil generate ---
+// File JSON berisi daftar audio yang sudah dibuat (untuk list + download ulang)
+$HISTORY_FILE = __DIR__ . '/generated/history.json';
+// Masa simpan WAV (detik). Default 7 hari, agar history tetap bisa diunduh ulang.
+$WAV_MAX_AGE = 7 * 24 * 60 * 60;
+// Jumlah maksimal entri history yang disimpan
+$HISTORY_LIMIT = 200;

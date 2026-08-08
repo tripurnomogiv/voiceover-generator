@@ -59,6 +59,23 @@ foreach ($LANGS as $l) {
   .top { display: flex; align-items: center; justify-content: space-between; }
   a.logout { color: #8b93a7; font-size: 13px; text-decoration: none; }
   a.logout:hover { color: #ff6b6b; }
+  .history { margin-top: 32px; }
+  .history h2 { font-size: 16px; margin: 0 0 12px; color: #b6bdcc; }
+  .hitem { background: #171a23; border: 1px solid #2a2f3d; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+  .htext { font-size: 13px; margin: 0 0 6px; color: #e6e6e6; line-height: 1.4; }
+  .hmeta { font-size: 11px; color: #8b93a7; margin-bottom: 8px; }
+  .hbtns { display: flex; gap: 8px; }
+  .hbtns a, .hbtns button {
+    flex: 1; text-align: center; padding: 8px 10px; font-size: 12px; font-weight: 600;
+    border-radius: 6px; text-decoration: none; border: 0; cursor: pointer;
+  }
+  .hbtns a.play { background: #24304a; color: #8ab4ff; }
+  .hbtns a.play:hover { background: #2c3b5c; }
+  .hbtns a.dl2 { background: #1e5c46; color: #7dffd0; }
+  .hbtns a.dl2:hover { background: #267156; }
+  .hbtns button.del { background: #3a2020; color: #ff8f8f; }
+  .hbtns button.del:hover { background: #4a2727; }
+  .empty { color: #5a6172; font-size: 13px; padding: 12px 0; }
 </style>
 </head>
 <body>
@@ -98,6 +115,11 @@ foreach ($LANGS as $l) {
     <audio id="player" controls></audio>
     <br>
     <a class="dl" id="download" href="#" download="voiceover.wav">Download .wav</a>
+  </div>
+
+  <div class="history">
+    <h2>History</h2>
+    <div id="histList"></div>
   </div>
 </div>
 
@@ -143,6 +165,7 @@ btn.addEventListener('click', async () => {
     download.href = 'download.php?token=' + data.token + '&name=' + encodeURIComponent(makeSlug(text));
     resultEl.classList.add('show');
     statusEl.textContent = 'Selesai. Audio siap diputar / diunduh.';
+    loadHistory();
   } catch (e) {
     statusEl.textContent = 'Error: ' + e.message;
     statusEl.classList.add('err');
@@ -156,6 +179,59 @@ function makeSlug(str) {
   const words = str.trim().toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
   return words.slice(0, 3).join('-') || 'voiceover';
 }
+
+// ===== History =====
+const histList = document.getElementById('histList');
+
+function fmtBytes(n) {
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
+  return n + ' B';
+}
+function fmtDate(ts) {
+  const d = new Date(ts * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  return d.getDate() + ' ' + ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][d.getMonth()]
+    + ' ' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch('history.php');
+    const list = await res.json();
+    if (!Array.isArray(list)) { histList.innerHTML = '<div class="empty">Belum ada history.</div>'; return; }
+    if (list.length === 0) { histList.innerHTML = '<div class="empty">Belum ada history.</div>'; return; }
+
+    histList.innerHTML = list.map(e => {
+      const slug = makeSlug(e.text);
+      return '<div class="hitem">'
+        + '<p class="htext">' + esc(e.text) + '</p>'
+        + '<div class="hmeta">' + esc(e.voice) + ' · ' + esc(e.lang) + ' · '
+          + fmtBytes(e.size) + ' · ' + fmtDate(e.created) + '</div>'
+        + '<div class="hbtns">'
+        + '<a class="play" href="generate.php?play=' + e.token + '">Putar</a>'
+        + '<a class="dl2" href="download.php?token=' + e.token + '&name=' + encodeURIComponent(slug) + '">Download</a>'
+        + '<button class="del" data-token="' + e.token + '">Hapus</button>'
+        + '</div></div>';
+    }).join('');
+
+    // Hapus
+    histList.querySelectorAll('.del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Hapus audio ini?')) return;
+        await fetch('history.php?delete=' + btn.dataset.token);
+        loadHistory();
+      });
+    });
+  } catch (e) {
+    histList.innerHTML = '<div class="empty">Gagal memuat history.</div>';
+  }
+}
+
+loadHistory();
 </script>
 </body>
 </html>

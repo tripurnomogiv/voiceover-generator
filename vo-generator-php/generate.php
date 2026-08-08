@@ -150,8 +150,11 @@ if (file_put_contents($file, $wav) === false) {
     exit;
 }
 
-// Bersihkan file lama (> 30 menit) agar tidak menumpuk
-$maxAge = 30 * 60;
+// Catat ke history agar bisa list + download ulang
+addHistory($token, $text, $voice, $lang, $rate, strlen($wav));
+
+// Bersihkan file lama (lebih dari masa simpan) agar tidak menumpuk
+$maxAge = $WAV_MAX_AGE;
 foreach (glob($dir . '/*.wav') as $old) {
     if (filemtime($old) < time() - $maxAge) {
         @unlink($old);
@@ -165,6 +168,32 @@ echo json_encode([
     'size'  => strlen($wav),
 ]);
 exit;
+
+function addHistory(string $token, string $text, string $voice, string $lang, int $rate, int $size): void
+{
+    global $HISTORY_FILE, $HISTORY_LIMIT;
+
+    $list = [];
+    if (is_file($HISTORY_FILE)) {
+        $decoded = json_decode((string)file_get_contents($HISTORY_FILE), true);
+        if (is_array($decoded)) {
+            $list = $decoded;
+        }
+    }
+
+    array_unshift($list, [
+        'token'   => $token,
+        'text'    => mb_substr(preg_replace('/\s+/u', ' ', $text), 0, 120),
+        'voice'   => $voice,
+        'lang'    => $lang,
+        'rate'    => $rate,
+        'size'    => $size,
+        'created' => time(),
+    ]);
+
+    $list = array_slice($list, 0, $HISTORY_LIMIT);
+    @file_put_contents($HISTORY_FILE, json_encode($list));
+}
 
 function pcmToWav(string $pcm, int $rate, int $channels, int $sampleWidth): string
 {

@@ -1,0 +1,2 @@
+# Blokir akses langsung ke file WAV (hanya lewat download.php / generate.php?play=)
+Require all denied

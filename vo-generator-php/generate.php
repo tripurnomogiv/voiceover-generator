@@ -41,8 +41,12 @@ if ($text === '') {
 }
 $voice   = $_POST['voice']   ?? $DEFAULT_VOICE;
 $lang    = $_POST['language'] ?? $DEFAULT_LANG;
-$prompt  = trim($_POST['prompt'] ?? $DEFAULT_PROMPT);
-if ($prompt === '') $prompt = $DEFAULT_PROMPT;
+$prompt  = trim($_POST['prompt'] ?? '');
+if ($prompt === '') {
+    // Prompt tidak dikirim / kosong -> pakai prompt tersimpan (jika ada), lalu default.
+    $prompt = loadSavedPrompt();
+    if ($prompt === '') $prompt = $DEFAULT_PROMPT;
+}
 $pronounce = trim($_POST['pronounce'] ?? '');
 if ($pronounce !== '') {
     $text = applyPronounce($text, $pronounce);
@@ -71,22 +75,62 @@ $body = [
     ],
 ];
 
-$url = 'https://generativelanguage.googleapis.com/v1beta/models/'
-     . $MODEL . ':streamGenerateContent?key=' . urlencode($GEMINI_API_KEY);
+// Kumpulkan daftar key (array utama + fallback single key), buang yang kosong/placeholder.
+$keys = array_values(array_filter($GEMINI_API_KEYS, function ($k) {
+    return is_string($k) && $k !== '' && strpos($k, 'your_api_key') !== 0;
+}));
+if (empty($keys) && is_string($GEMINI_API_KEY) && $GEMINI_API_KEY !== '' && strpos($GEMINI_API_KEY, 'your_api_key') !== 0) {
+    $keys[] = $GEMINI_API_KEY;
+}
+if (empty($keys)) {
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'GEMINI_API_KEY belum diisi di config.php.']);
+    exit;
+}
 
-$ch = curl_init($url);
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_POST => true,
-    CURLOPT_POSTFIELDS => json_encode($body),
-    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-    CURLOPT_TIMEOUT => 120,
-    CURLOPT_CONNECTTIMEOUT => 10,
-]);
-$response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$curlErr  = curl_error($ch);
-curl_close($ch);
+// --- Coba tiap key; jika 429, lanjut ke key berikutnya ---
+$response = false;
+$httpCode = 0;
+$curlErr = '';
+$lastErrorMsg = '';
+$bodyJson = json_encode($body);
+
+foreach ($keys as $i => $key) {
+    $url = 'https://generativelanguage.googleapis.com/v1beta/models/'
+         . $MODEL . ':streamGenerateContent?key=' . urlencode($key);
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $bodyJson,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT => 120,
+        CURLOPT_CONNECTTIMEOUT => 10,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false) {
+        $lastErrorMsg = 'Gagal terhubung ke API (key ' . ($i + 1) . '): ' . $curlErr;
+        continue; // coba key berikutnya
+    }
+
+    $data = json_decode($response, true);
+    $msg = $data['error']['message'] ?? '';
+
+    // Hanya lanjut ke key berikutnya jika kena limit (429) atau key invalid (401).
+    if ($httpCode === 429 || $httpCode === 401 || $httpCode === 403) {
+        $lastErrorMsg = $msg !== '' ? $msg : ('HTTP ' . $httpCode);
+        continue;
+    }
+
+    // Berhasil (atau error lain yang tidak dipakai key lain) -> berhenti.
+    $lastErrorMsg = '';
+    break;
+}
 
 if ($response === false) {
     header('Content-Type: application/json');
@@ -170,8 +214,7 @@ echo json_encode([
 exit;
 
 function addHistory(string $token, string $text, string $voice, string $lang, int $rate, int $size): void
-{
-    global $HISTORY_FILE, $HISTORY_LIMIT;
+{    global $HISTORY_FILE, $HISTORY_LIMIT;
 
     $list = [];
     if (is_file($HISTORY_FILE)) {
@@ -223,4 +266,16 @@ function applyPronounce(string $text, string $rules): string
         $text = preg_replace('/\b' . preg_quote($kata, '/') . '\b/iu', $ejaan, $text);
     }
     return $text;
+}
+
+function loadSavedPrompt(): string
+{
+    global $PROMPT_FILE;
+    if (is_file($PROMPT_FILE)) {
+        $decoded = json_decode((string)file_get_contents($PROMPT_FILE), true);
+        if (is_array($decoded) && !empty($decoded['prompt'])) {
+            return (string)$decoded['prompt'];
+        }
+    }
+    return '';
 }

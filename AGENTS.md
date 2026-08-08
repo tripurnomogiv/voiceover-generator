@@ -41,10 +41,12 @@ Set in `.env`:
 - Indonesian accent: `language_code` is NOT supported by the Interactions TTS API. To force Indonesian pronunciation, the default prompt explicitly instructs id-ID accent. Users can also set per-word overrides in the "Koreksi pelafalan" field (format `kata=ejaan` per line), applied by `apply_pronounce()` (Python) / `applyPronounce()` (PHP) before sending.
 
 ## PHP Version (`vo-generator-php/`)
-- For shared hosting (PHP 7.4+), uses cURL to call the same Interactions API.
+- For shared hosting (PHP 7.4+), uses cURL to call the same Interactions/streamGenerateContent API.
 - Login: `shopee` / `affiliate` (set in `config.php`), session-based.
-- WAV saved to `generated/`, play via `generate.php?play=<token>`, download via `download.php?token=<token>&name=<slug>`.
+- WAV saved to `generated/`, play via `generate.php?play=<token>`, download via `download.php?token=<token>&name=<slug>`, history via `history.php`.
 - IMPORTANT: WAV header built with `pack('A4VA4', 'RIFF', $size, 'WAVE')` — must include the `A4` format code for "WAVE", otherwise the file has no RIFF/WAVE marker and browsers can't play it.
+- API key rotation: `$GEMINI_API_KEYS` array (up to 3 keys). On 429/401/403 the code tries the next key automatically.
+- Saved prompt: "Simpan Prompt" button writes to `generated/prompt.json` via `settings.php`; that prompt becomes the default (used by index.php field and generate.php fallback).
 - Free tier rate limit: ~10 requests/minute per project (429 errors expected if exceeded).
 - Some short phrases may trigger Google content-policy blocks (false positives); use realistic sentences.
 

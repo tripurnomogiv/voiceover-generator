@@ -21,6 +21,15 @@ foreach ($LANGS as $l) {
     $sel = ($l === $DEFAULT_LANG) ? ' selected' : '';
     $langOptions .= '<option value="' . htmlspecialchars($l) . '"' . $sel . '>' . htmlspecialchars($l) . '</option>';
 }
+
+// Prompt default: pakai yang tersimpan (jika ada), jika tidak pakai $DEFAULT_PROMPT
+$promptValue = $DEFAULT_PROMPT;
+if (is_file($PROMPT_FILE)) {
+    $decoded = json_decode((string)file_get_contents($PROMPT_FILE), true);
+    if (is_array($decoded) && !empty($decoded['prompt'])) {
+        $promptValue = $decoded['prompt'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -103,7 +112,9 @@ foreach ($LANGS as $l) {
   </div>
 
   <label for="prompt">Gaya bicara (opsional)</label>
-  <input id="prompt" type="text" value="<?php echo htmlspecialchars($DEFAULT_PROMPT); ?>">
+  <input id="prompt" type="text" value="<?php echo htmlspecialchars($promptValue); ?>">
+  <button id="savePromptBtn" style="margin-top:8px;padding:8px 12px;font-size:12px;width:auto;background:#2a2f3d;font-weight:600">Simpan Prompt</button>
+  <span id="promptSaved" style="font-size:12px;color:#8ab4ff;margin-left:8px"></span>
 
   <label for="pronounce">Koreksi pelafalan (opsional) — format: <code>kata=ejaan</code> tiap baris</label>
   <textarea id="pronounce" rows="3" placeholder="produk=pro-duk&#10;gudang=gu-dang" style="min-height:70px"></textarea>
@@ -129,6 +140,30 @@ const statusEl = document.getElementById('status');
 const resultEl = document.getElementById('result');
 const player = document.getElementById('player');
 const download = document.getElementById('download');
+const savePromptBtn = document.getElementById('savePromptBtn');
+const promptSaved = document.getElementById('promptSaved');
+
+savePromptBtn.addEventListener('click', async () => {
+  const form = new URLSearchParams();
+  form.append('prompt', document.getElementById('prompt').value);
+  savePromptBtn.disabled = true;
+  promptSaved.textContent = 'Menyimpan...';
+  try {
+    const res = await fetch('settings.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form,
+    });
+    const d = await res.json();
+    if (d.error) { promptSaved.textContent = d.error; }
+    else if (d.saved) { promptSaved.textContent = 'Tersimpan. Prompt ini jadi default.'; }
+    else { promptSaved.textContent = 'Prompt kosong, kembali ke default bawaan.'; }
+  } catch (e) {
+    promptSaved.textContent = 'Error: ' + e.message;
+  } finally {
+    savePromptBtn.disabled = false;
+  }
+});
 
 btn.addEventListener('click', async () => {
   const text = document.getElementById('text').value.trim();

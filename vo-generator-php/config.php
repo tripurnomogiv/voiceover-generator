@@ -4,6 +4,13 @@
 
 // API key gratis dari https://aistudio.google.com/app/apikey
 // Tanpa billing, tanpa Google Cloud.
+// Bisa isi 3 key: saat key 1 kena limit (429), otomatis pakai key 2, lalu key 3.
+$GEMINI_API_KEYS = [
+    'KEY1',
+    'KEY2',
+    'KEY3',
+];
+// Backward-compat: jika hanya pakai satu key, bisa juga set di variabel ini.
 $GEMINI_API_KEY = 'your_api_key_here';
 
 // --- Login sederhana ---
@@ -62,3 +69,8 @@ $HISTORY_FILE = __DIR__ . '/generated/history.json';
 $WAV_MAX_AGE = 7 * 24 * 60 * 60;
 // Jumlah maksimal entri history yang disimpan
 $HISTORY_LIMIT = 200;
+
+// --- Prompt tersimpan (disunting user) ---
+// File JSON berisi prompt yang disimpan user via tombol "Simpan Prompt".
+// Jika ada, prompt ini dipakai sebagai default (menggantikan $DEFAULT_PROMPT).
+$PROMPT_FILE = __DIR__ . '/generated/prompt.json';
